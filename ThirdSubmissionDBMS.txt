@@ -1,0 +1,392 @@
+﻿DROP DATABASE IF EXISTS online_retail_store;
+
+
+CREATE DATABASE online_retail_store;
+USE online_retail_store;
+
+
+-- POPULATE DATABASE
+CREATE TABLE Address
+(
+   AddressID INT PRIMARY KEY AUTO_INCREMENT,
+   Street VARCHAR(30) NOT NULL,
+   City VARCHAR(30) NOT NULL,
+   State VARCHAR(30) NOT NULL,
+   ZIPCode VARCHAR(10) NOT NULL CHECK (ZIPCode REGEXP '^[0-9]+$') -- Ensure ZIPCode contains only numbers
+);
+
+
+-- POPULATE DATABASE
+CREATE TABLE Customer
+(
+   CustomerID INT PRIMARY KEY AUTO_INCREMENT,
+   FirstName VARCHAR(20) NOT NULL,
+   LastName VARCHAR(20) NOT NULL,
+
+
+   DateOfBirth DATETIME,
+   EmailAddress VARCHAR(30) UNIQUE,
+   TelephoneNumber VARCHAR(12) CHECK (TelephoneNumber REGEXP '^[0-9]+$'), -- Ensure TelephoneNumber contains only numbers
+
+
+   Username VARCHAR(20) UNIQUE,
+   Pass VARCHAR(20) NOT NULL,
+
+
+   DefaultChestSize VARCHAR(5),
+   DefaultWaistSize VARCHAR(5),
+   DefaultShoeSize VARCHAR(5),
+
+
+   AddressID INT, -- Foreign key to Address table
+
+
+   WalletBalance DECIMAL(10,2) DEFAULT 0.00 CHECK (WalletBalance >= 0),
+
+
+   DateOfJoining DATETIME DEFAULT CURRENT_TIMESTAMP, -- not in er diagram
+
+
+   NumberOfOrders INT DEFAULT 0 CHECK (NumberOfOrders >= 0), -- orderIDs, returned order ids, wishlist, cart not there
+
+
+   LastOrderID INT ,
+   Cart JSON,
+   OrderIDs JSON,
+   ReturnedOrderIDs JSON,
+   WishlistProductIDs JSON,
+   -- FOREIGN KEY (LastOrderID) REFERENCES Orderr(OrderID),
+   FOREIGN KEY (AddressID) REFERENCES Address(AddressID)
+);
+
+
+-- POPULATE DATABASE
+CREATE TABLE Product
+(
+ ProductID INT PRIMARY KEY AUTO_INCREMENT,
+
+
+ ItemName VARCHAR(20) NOT NULL,
+ Brand VARCHAR(20) NOT NULL,
+
+
+ Descr VARCHAR(200) NOT NULL,
+
+
+ IMAGEURL VARCHAR(100),
+ Price DECIMAL(10,2) NOT NULL CHECK (Price >= 0),
+
+
+ ProductCategory INT,  -- 1 for men, 2 for women, 3 for footwear, 4 for accessories
+ ProductSubCategory varchar(20),
+ StoreIDs JSON
+-- ADD available stores
+);
+
+
+-- POPULATE DATABASE
+CREATE TABLE Manager
+(
+ ManagerID INT PRIMARY KEY AUTO_INCREMENT,
+ FullName VARCHAR(20) NOT NULL CHECK (FullName <> ''),
+ Pass VARCHAR(255) NOT NULL,  -- Consider hashing and salting passwords
+ StoreID INT,
+ DateOfJoining DATETIME DEFAULT CURRENT_TIMESTAMP,
+ JoinedRating DECIMAL(10,2)
+ -- FOREIGN KEY (StoreID) REFERENCES Store(StoreID)
+);
+
+
+-- POPULATE DATABASE
+CREATE TABLE Store
+(
+   StoreID INT PRIMARY KEY AUTO_INCREMENT,
+   StoreName VARCHAR(20) NOT NULL CHECK (StoreName <> ''),
+   NumberofProducts  INT,
+   DateOfStart DATETIME DEFAULT CURRENT_TIMESTAMP,
+   StoreRating DECIMAL(10,2),
+   ManagerID INT,  -- Assuming one manager per store
+   ProductIDs JSON,
+   FOREIGN KEY (ManagerID) REFERENCES Manager(ManagerID)
+);
+
+
+CREATE TABLE ProductInStore
+(
+   ProductID INT,
+   StoreID INT,
+   Price DECIMAL(10,2) NOT NULL CHECK (Price >= 0), -- Added constraint
+   Stock INT NOT NULL CHECK (Stock >= 0),
+   StoreRating DECIMAL(10,2) CHECK (StoreRating >= 0 AND StoreRating <= 5) NOT NULL,
+   DiscountPercentage INT CHECK (DiscountPercentage >= 0),
+   PRIMARY KEY (ProductID, StoreID),
+   FOREIGN KEY (ProductID) REFERENCES Product(ProductID),
+   FOREIGN KEY (StoreID) REFERENCES Store(StoreID)
+);
+
+
+
+
+CREATE TABLE Feedback
+(
+   FeedbackID INT PRIMARY KEY AUTO_INCREMENT,
+   Content VARCHAR(200) NOT NULL,
+   Rating DECIMAL(10,2) NOT NULL CHECK (Rating >= 0 AND Rating <= 5),
+   CustomerID INT,
+   OrderID INT,
+   DateTimeOfFeedback DATETIME DEFAULT CURRENT_TIMESTAMP,
+   UNIQUE (OrderID, CustomerID),
+   FOREIGN KEY (CustomerID) REFERENCES Customer(CustomerID)
+);
+
+
+CREATE TABLE Orders
+(
+   OrderID INT PRIMARY KEY AUTO_INCREMENT, -- (customerID-number of customers)
+   CustomerID INT,
+   StoreID INT,
+   ProductID INT,
+   TrackingID VARCHAR(5),
+   DeliveryStatus VARCHAR(20),
+   ExpectedDeliveryTime DATETIME,
+   NumberOfProducts INT CHECK (NumberOfProducts >= 0),
+   DateTimeOfOrderPlaced DATETIME DEFAULT CURRENT_TIMESTAMP,
+   ModeOfPayment VARCHAR(20) DEFAULT "COD" CHECK (ModeOfPayment IN ('COD', 'Credit Card', 'PayPal')),
+   AddressID INT,
+   HasFeedback BOOLEAN DEFAULT FALSE,
+   FOREIGN KEY (AddressID) REFERENCES Address(AddressID),
+   FOREIGN KEY (CustomerID) REFERENCES Customer(CustomerID),
+   FOREIGN KEY (ProductID, StoreID) REFERENCES ProductInStore(ProductID, StoreID)
+);
+
+
+ALTER TABLE Customer
+ADD FOREIGN KEY (LastOrderID) REFERENCES Orders(OrderID);
+
+
+ALTER TABLE Manager
+ADD FOREIGN KEY (StoreID) REFERENCES Store(StoreID);
+
+
+ALTER TABLE Feedback
+ADD FOREIGN KEY (OrderID) REFERENCES Orders(OrderID);
+
+
+INSERT INTO Address (Street, City, State, ZipCode)
+VALUES
+('1 MG Road', 'Bangalore', 'Karnataka', '560001'),
+('S.G. Highway', 'Ahmedabad', 'Gujarat', '380054'),
+('J.L. Nehru Road', 'Kolkata', 'West Bengal', '700071'),
+('Cuffe Parade', 'Mumbai', 'Maharashtra', '400005'),
+('Anna Salai', 'Chennai', 'Tamil Nadu', '600002'),
+('Connaught Place', 'New Delhi', 'Delhi', '110001'),
+('Park Street', 'Kolkata', 'West Bengal', '700016'),
+('Linking Road', 'Mumbai', 'Maharashtra', '400050'),
+('MG Marg', 'Lucknow', 'Uttar Pradesh', '226001'),
+('Abids Road', 'Hyderabad', 'Telangana', '500001');
+
+
+
+
+INSERT INTO Customer (FirstName, LastName, DateOfBirth, EmailAddress, TelephoneNumber, Username, Pass, DefaultChestSize, DefaultWaistSize, DefaultShoeSize, AddressID, WalletBalance, LastOrderID, Cart, OrderIDs, ReturnedOrderIDs, WishlistProductIDs)
+VALUES
+('Raj', 'Kumar', '1990-05-15', 'raj.kumar@email.com', '9876543210', 'raj123', 'pass123', '40', '34', '9', 1, 100.50, NULL, NULL, NULL, NULL, NULL),
+('Priya', 'Sharma', '1985-12-02', 'priya.sharma@email.com', '8765432109', 'priya456', 'pass456', '36', '28', '7', 2, 75.25, NULL, NULL, NULL, NULL, NULL),
+('Amit', 'Patel', '1993-08-20', 'amit.patel@email.com', '7654321098', 'amit789', 'pass789', '42', '36', '8', 3, 120.75, NULL, NULL, NULL, NULL, NULL),
+('Sara', 'Singh', '1988-03-18', 'sara.singh@email.com', '6543210987', 'sara321', 'pass321', '38', '32', '6', 4, 90.00, NULL, NULL, NULL, NULL, NULL),
+('Aryan', 'Verma', '1992-09-25', 'aryan.verma@email.com', '5432109876', 'aryan567', 'pass567', '44', '38', '10', 5, 150.00, NULL, NULL, NULL, NULL, NULL),
+('Neha', 'Gupta', '1995-06-12', 'neha.gupta@email.com', '4321098765', 'neha678', 'pass678', '35', '29', '7', 6, 80.50, NULL, NULL, NULL, NULL, NULL),
+('Vikram', 'Shinde', '1987-11-30', 'vikram.shinde@email.com', '3210987654', 'vikram789', 'pass789', '41', '35', '9', 7, 110.25, NULL, NULL, NULL, NULL, NULL),
+('Mira', 'Rajput', '1990-04-22', 'mira.rajput@email.com', '2109876543', 'mira123', 'pass123', '37', '31', '8', 8, 95.75, NULL, NULL, NULL, NULL, NULL),
+('Rahul', 'Malhotra', '1984-07-14', 'rahul.malhotra@email.com', '1098765432', 'rahul456', 'pass456', '39', '33', '7', 9, 85.00, NULL, NULL, NULL, NULL, NULL),
+('Anjali', 'Desai', '1998-02-08', 'anjali.desai@email.com', '9876543210', 'anjali789', 'pass789', '36', '30', '6', 10, 120.00, NULL, NULL, NULL, NULL, NULL);
+
+
+INSERT INTO Product (ItemName, Brand, Descr, IMAGEURL, Price, ProductCategory, ProductSubCategory, StoreIDs)
+VALUES
+('Cotton T-Shirt', 'Brand1', 'Description1', 'image_url1.jpg', 499.99, 1, 'Men`s T-Shirts', '[1, 3, 4]'),
+('Formal Shirt', 'Brand2', 'Description2', 'image_url2.jpg', 899.99, 1, 'Men`s Shirts', '[2, 3, 5, 7]'),
+('Denim Jeans', 'Brand3', 'Description3', 'image_url3.jpg', 1199.99, 1, 'Men`s Jeans', '[1, 2, 6]'),
+('Casual Dress', 'Brand4', 'Description4', 'image_url4.jpg', 1299.99, 2, 'Women`s Dresses', '[3, 4, 5, 7]'),
+('Saree', 'Brand5', 'Description5', 'image_url5.jpg', 1999.99, 2, 'Women`s Ethnic Wear', '[1, 3, 7]'),
+('Kurti', 'Brand6', 'Description6', 'image_url6.jpg', 899.99, 2, 'Women`s Kurtis', '[2, 3]'),
+('Sports Shoes', 'Brand7', 'Description7', 'image_url7.jpg', 1499.99, 3, 'Footwear', '[1, 2, 4, 5, 6, 7]'),
+('Formal Shoes', 'Brand8', 'Description8', 'image_url8.jpg', 1799.99, 3, 'Footwear', '[3, 5]'),
+('Backpack', 'Brand9', 'Description9', 'image_url9.jpg', 799.99, 4, 'Accessories', '[1, 2, 4]'),
+('Sunglasses', 'Brand10', 'Description10', 'image_url10.jpg', 499.99, 4, 'Accessories', '[3, 7]'),
+('Summer Shorts', 'Brand1', 'Lightweight shorts for hot days', 'image_url11.jpg', 299.99, 1, 'Men`s Shorts', '[2, 3, 4]'),
+('Classic Chinos', 'Brand12', 'Versatile chinos for a smart-casual look', 'image_url12.jpg', 1099.99, 1, 'Men`s Trousers', '[1, 2, 5]'),
+('Printed Shirt', 'Brand13', 'Stylish printed shirt for a trendy appearance', 'image_url13.jpg', 799.99, 1, 'Men`s Shirts', '[2, 4]'),
+('Maxi Dress', 'Brand14', 'Elegant maxi dress for special occasions', 'image_url14.jpg', 1499.99, 2, 'Women`s Dresses', '[1, 3]'),
+('Palazzo Pants', 'Brand15', 'Comfortable palazzo pants for a relaxed look', 'image_url15.jpg', 899.99, 2, 'Women`s Bottoms', '[2, 6]'),
+('Saree', 'Brand16', 'Embroidered saree for traditional events', 'image_url16.jpg', 2499.99, 2, 'Women`s Ethnic Wear', '[1, 3, 5]'),
+('Printed Kurti', 'Brand17', 'Printed kurti for a vibrant style', 'image_url17.jpg', 999.99, 2, 'Women`s Kurtis', '[4]'),
+('Running Shoes', 'Brand18', 'Durable running shoes for active individuals', 'image_url18.jpg', 1299.99, 3, 'Footwear', '[1, 5]'),
+('Formal Boots', 'Brand19', 'Stylish formal boots for a polished look', 'image_url19.jpg', 1599.99, 3, 'Footwear', '[6]'),
+('Travel Backpack', 'Brand20', 'Spacious travel backpack for your adventures', 'image_url20.jpg', 899.99, 4, 'Accessories', '[1, 3, 7]');
+
+
+INSERT INTO Manager (FullName, Pass, JoinedRating)
+VALUES
+('John Doe', 'password123', 4.5),
+('Jane Smith', 'securepass456', 4.2),
+('Rahul Kapoor', 'strongpass789', 4.8),
+('Amit Kumar', 'pass123', 4.0),
+('Neha Sharma', 'secure123', 4.7),
+('Suresh Verma', 'pass456', 4.3),
+('Priya Gupta', 'strong456', 4.9);
+DELIMITER //
+-- Create trigger for updating NumberofProducts on INSERT
+CREATE TRIGGER update_NumberofProducts
+BEFORE INSERT ON Store
+FOR EACH ROW
+BEGIN
+   SET NEW.NumberofProducts = JSON_LENGTH(NEW.ProductIDs);
+END;
+
+
+-- Create trigger for updating NumberofProducts on UPDATE
+CREATE TRIGGER update_NumberofProducts_update
+BEFORE UPDATE ON Store
+FOR EACH ROW
+BEGIN
+   SET NEW.NumberofProducts = JSON_LENGTH(NEW.ProductIDs);
+END;
+//
+
+
+DELIMITER ;
+
+
+-- Insert data into the Store table
+INSERT INTO Store (StoreName, DateOfStart, StoreRating, ManagerID, ProductIDs)
+VALUES
+('Fashion Hub', '2023-01-01', 4.6, 1, '[1, 2, 3]'),
+('Ethnic Emporium', '2023-02-15', 4.2, 2, '[4, 5]'),
+('Footwear Haven', '2023-03-30', 4.9, 3, '[6, 7]'),
+('Trendy Threads', '2023-04-10', 4.4, 4, '[8, 9, 10, 11]'),
+('Elegant Ensembles', '2023-05-22', 4.7, 5, '[12, 13, 14]'),
+('Active Lifestyle', '2023-06-05', 4.1, 6, '[15, 16]'),
+('Accessories Galore', '2023-07-17', 4.8, 7, '[17, 18, 19]');
+
+
+UPDATE Manager M
+SET StoreID = (
+   SELECT S.StoreID
+   FROM Store S
+   WHERE M.ManagerID = S.ManagerID
+)
+WHERE StoreID IN (1, 2, 3, 4, 5, 6, 7);
+
+
+UPDATE Store
+SET ProductIDs = (
+   SELECT JSON_ARRAYAGG(ProductID)
+   FROM Product
+   WHERE JSON_CONTAINS(StoreIDs, CAST(Store.StoreID AS JSON), '$')
+)
+WHERE StoreID IN (1, 2, 3, 4, 5, 6, 7);
+
+
+
+
+
+
+-- INSERT INTO ProductInStore (ProductID, StoreID, Price, Stock, StoreRating, DiscountPercentage)
+-- VALUES
+-- (1, 1, 499.99, 50, 4, 0),
+-- (2, 1, 899.99, 30, 4, 10),
+-- (3, 1, 1199.99, 20, 4, 5),
+-- (4, 2, 1299.99, 25, 4.2, 0),
+-- (5, 2, 1999.99, 15, 4.2, 0),
+-- (6, 3, 1499.99, 40, 4.9, 15),
+-- (7, 3, 1799.99, 35, 4.9, 0),
+-- (8, 4, 299.99, 60, 4.4, 0),
+-- (9, 4, 1099.99, 20, 4.4, 20),
+-- (10, 4, 799.99, 25, 4.4, 0),
+-- (11, 4, 499.99, 45, 4.4, 0),
+-- (12, 5, 799.99, 30, 4.7, 0),
+-- (13, 5, 599.99, 40, 4.7, 0),
+-- (14, 5, 999.99, 25, 4.7, 0),
+-- (15, 6, 399.99, 55, 4.1, 0),
+-- (16, 6, 2499.99, 10, 4.1, 0),
+-- (17, 7, 799.99, 20, 4.8, 0),
+-- (18, 7, 1299.99, 15, 4.8, 0),
+-- (19, 7, 1599.99, 10, 4.8, 0);
+
+
+INSERT INTO ProductInStore (ProductID, StoreID, Price, Stock, StoreRating, DiscountPercentage)
+SELECT
+   p.ProductID,
+   s.StoreID,
+   p.Price,
+   100, -- Assuming an initial stock of 100 for each product in each store
+   s.StoreRating,
+   0    -- Assuming no initial discount
+FROM Product p
+JOIN Store s ON JSON_CONTAINS(p.StoreIDs, CAST(s.StoreID AS JSON), '$');
+
+
+-- Inserting sample data into Orders table
+INSERT INTO Orders (CustomerID, StoreID, ProductID, TrackingID, DeliveryStatus, ExpectedDeliveryTime, NumberOfProducts, ModeOfPayment, AddressID, HasFeedback)
+VALUES
+(1, 1, 1, 'AB123', 'Delivered', '2023-12-20 10:00:00', 2, 'Credit Card', 1, TRUE),
+(1, 1, 3, 'CD456', 'Delivered', '2023-12-22 12:00:00', 1, 'COD', 1, TRUE),
+(1, 2, 2, 'EF789', 'In Transit', '2023-12-25 09:00:00', 1, 'PayPal', 2, FALSE),
+(1, 3, 6, 'GH012', 'Pending', '2023-12-27 14:00:00', 1, 'COD', 3, FALSE),
+(2, 4, 9, 'IJ345', 'Delivered', '2023-12-29 16:00:00', 3, 'Credit Card', 4, TRUE),
+(2, 5, 12, 'KL678', 'Delivered', '2023-12-31 11:00:00', 1, 'COD', 5, TRUE),
+(2, 6, 7, 'MN910', 'Delivered', '2024-01-02 13:00:00', 2, 'Credit Card', 6, TRUE),
+(3, 7, 7, 'OP123', 'Delivered', '2024-01-04 15:00:00', 1, 'COD', 7, TRUE),
+(3, 7, 7, 'QR456', 'Pending', '2024-01-06 17:00:00', 1, 'Credit Card', 8, FALSE),
+(3, 7, 20, 'ST789', 'Delivered', '2024-01-08 19:00:00', 2, 'COD', 9, TRUE),
+(4, 1, 1, 'AB124', 'Delivered', '2023-12-20 10:00:00', 2, 'Credit Card', 1, TRUE),
+(4, 1, 3, 'CD457', 'Delivered', '2023-12-22 12:00:00', 1, 'COD', 1, TRUE),
+(2, 2, 2, 'EF780', 'In Transit', '2023-12-25 09:00:00', 1, 'PayPal', 2, FALSE),
+(6, 3, 6, 'GH013', 'Pending', '2023-12-27 14:00:00', 1, 'COD', 3, FALSE),
+(1, 4, 9, 'IJ346', 'Delivered', '2023-12-29 16:00:00', 3, 'Credit Card', 4, TRUE),
+(8, 5, 12, 'KL668', 'Delivered', '2023-12-31 11:00:00', 1, 'COD', 5, TRUE),
+(9, 6, 7, 'MN917', 'Delivered', '2024-01-02 13:00:00', 2, 'Credit Card', 6, TRUE),
+(7, 7, 7, 'OP127', 'Delivered', '2024-01-04 15:00:00', 1, 'COD', 7, TRUE),
+(4, 7, 7, 'QR453', 'Pending', '2024-01-06 17:00:00', 1, 'Credit Card', 8, FALSE),
+(3, 7, 20, 'ST759', 'Delivered', '2024-01-08 19:00:00', 2, 'COD', 9, TRUE);
+
+
+INSERT INTO Feedback (Content, Rating, CustomerID, OrderID)
+VALUES
+('Happy with quality and delivery', 4.5, 1, 1),
+('Wrong size delivered', 3.5, 1, 2),
+('Nice product but slightly damaged', 4.2, 1, 4),
+('Perfect fit and good fabric', 4.7, 1, 5),
+('Loved the design and colors', 4.9, 2, 6),
+('Very comfortable but took time to deliver', 4.2, 2, 7),
+('Bag looks premium but zip got stuck', 4.3, 2, 8),
+('Nice formal shoes but sole got detached', 3.8, 3, 9),
+('Travel bag is good quality', 4.6, 3, 10),
+('Did not like the sunglasses frame quality', 3.2, 3, 3),
+('T-shirt color faded after 2 washes', 3.0, 4, 11),
+('Formal shirt fabric is very good', 4.8, 4, 12),
+('Jeans fitting is not proper', 3.2, 2, 13),
+('Sports shoes are very comfortable', 4.3, 6, 14),
+('Kurti embroidery came off', 2.5, 1, 15),
+('Saree material is premium', 4.6, 8, 16),
+('Boots are stylish but size is incorrect', 3.7, 9, 17),
+('Backpack straps are flimsy', 3.0, 7, 18),
+('Cotton t-shirt shrunk after wash', 2.8, 4, 19),
+('Fabric of shorts is satisfactory', 3.9, 3, 20);
+
+
+
+
+
+
+
+
+SELECT * FROM Address;
+SELECT * FROM Customer;
+SELECT * FROM Manager;
+SELECT * FROM Store;
+SELECT * FROM Product;
+SELECT * FROM ProductInStore;
+SELECT * FROM Orders;
+SELECT * FROM Feedback;
